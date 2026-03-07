@@ -1,0 +1,47 @@
+
+version: '3.8'
+
+services:
+  db:
+  # El servicio de base de datos utiliza la imagen oficial de PostgreSQL versión 15.
+    image: postgres:15
+    container_name: nest_db
+    #En restart: always, el contenedor se reiniciará automáticamente si se detiene o falla, lo que ayuda a mantener la disponibilidad de la base de datos.
+    restart: always
+    # Configuración de variables de entorno para PostgreSQL, incluyendo el usuario, contraseña y nombre de la base de datos.
+    environment:
+      POSTGRES_USER: cesun_user
+      POSTGRES_PASSWORD: cesun_password
+      POSTGRES_DB: backend3_db
+    ports:
+      - '5432:5432'
+      # Montar un volumen para persistencia de datos, asegurando que los datos de la base de datos se mantengan incluso si el contenedor se reinicia o se elimina.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Conectar el servicio de base de datos a la red personalizada definida en la sección de redes, lo que permite la comunicación con otros servicios que también estén conectados a esta red.
+    networks:
+      - backend_network
+    # Healthcheck para verificar que la base de datos está lista
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cesun_user -d backend3_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Descomentar para limitar recursos del contenedor
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 1G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+# Red personalizada para aislar los servicios
+networks:
+  backend_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
