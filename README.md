@@ -25,6 +25,64 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## API auth and permissions
+
+This API now includes:
+
+- User table with role levels: `ADMIN`, `MANAGER`, `USER`
+- JWT authentication with Bearer token
+- Role-based authorization on product endpoints
+
+### Environment variables
+
+Create a `.env` file in project root with:
+
+```env
+DATABASE_URL="postgresql://cesun_user:cesun_password@localhost:5432/backend3_db"
+JWT_SECRET="replace-with-a-long-random-secret"
+JWT_EXPIRES_IN="1d"
+PORT=3000
+```
+
+### Auth endpoints
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me` (requires Bearer token)
+- `PATCH /api/v1/auth/users/:id/role` (ADMIN only)
+
+Register/login responses include:
+
+- `user`: safe user object without password
+- `access_token`: JWT token to send in protected requests
+
+### Product permissions by role
+
+- `GET /api/v1/products`, `GET /api/v1/products/count`, `GET /api/v1/products/:id`: `USER`, `MANAGER`, `ADMIN`
+- `POST /api/v1/products`: `MANAGER`, `ADMIN`
+- `PATCH /api/v1/products/:id`, `DELETE /api/v1/products/:id`, `PATCH /api/v1/products/:id/soft-delete`, `PATCH /api/v1/products/:id/restore`: `ADMIN`
+
+### Admin user seed
+
+Run:
+
+```bash
+npm run seed
+```
+
+Optional variables:
+
+```env
+ADMIN_SEED_EMAIL="admin@demo.com"
+ADMIN_SEED_PASSWORD="Admin12345!"
+```
+
+### Authorization header
+
+```http
+Authorization: Bearer <access_token>
+```
+
 ## Project setup
 
 ```bash

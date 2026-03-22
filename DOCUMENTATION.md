@@ -2,7 +2,7 @@
 
 ## Descripción General
 
-API REST desarrollada con **NestJS** para la gestión de productos. Implementa operaciones CRUD completas sobre una base de datos **PostgreSQL**, usando **Prisma ORM** como capa de acceso a datos. Incluye soft delete, restauración de registros y búsqueda con filtros dinámicos.
+API REST desarrollada con **NestJS** para la gestión de productos. Implementa operaciones CRUD completas sobre una base de datos **PostgreSQL**, usando **Prisma ORM** como capa de acceso a datos. Incluye soft delete, restauración de registros, búsqueda con filtros dinámicos y autenticación con JWT basada en roles.
 
 ---
 
@@ -18,6 +18,10 @@ API REST desarrollada con **NestJS** para la gestión de productos. Implementa o
 | class-validator | ^0.15.1 | Validación de DTOs |
 | class-transformer | ^0.5.1 | Transformación de tipos |
 | @nestjs/config | ^4.0.3 | Variables de entorno |
+| @nestjs/jwt | ^11.x | Emision y validacion de JWT |
+| @nestjs/passport | ^11.x | Integracion de estrategias de autenticacion |
+| passport-jwt | ^4.x | Estrategia JWT para request guard |
+| bcrypt | ^6.x | Hash y validacion de passwords |
 | Docker / Docker Compose | — | Infraestructura de base de datos |
 
 ---
@@ -35,6 +39,21 @@ cesun-backend-project/
 │   ├── prisma/
 │   │   ├── prisma.module.ts   # Módulo global de Prisma
 │   │   └── prisma.service.ts  # Servicio de conexión con Pool pg
+│   ├── auth/
+│   │   ├── auth.module.ts
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   ├── dto/
+│   │   │   ├── login.dto.ts
+│   │   │   └── register.dto.ts
+│   │   ├── guards/
+│   │   │   ├── jwt-auth.guard.ts
+│   │   │   └── roles.guard.ts
+│   │   └── strategies/jwt.strategy.ts
+│   ├── users/
+│   │   ├── users.module.ts
+│   │   ├── users.service.ts
+│   │   └── dto/create-user.dto.ts
 │   └── products/
 │       ├── products.module.ts
 │       ├── products.controller.ts  # Endpoints REST
@@ -65,24 +84,59 @@ cesun-backend-project/
 | `createdAt` | `TIMESTAMP` | Fecha de creación automática |
 | `updatedAt` | `TIMESTAMP` | Fecha de modificación automática |
 
+### Tabla `users`
+
+| Campo | Tipo | Descripcion |
+|---|---|---|
+| `id` | `String` (UUID) | Identificador unico generado automaticamente |
+| `email` | `VARCHAR(255)` | Email unico del usuario |
+| `password` | `VARCHAR(255)` | Password hasheada con bcrypt |
+| `role` | `Role` | Nivel de permiso: `ADMIN`, `MANAGER`, `USER` |
+| `isActive` | `BOOLEAN` | Estado del usuario (default: true) |
+| `createdAt` | `TIMESTAMP` | Fecha de creacion automatica |
+| `updatedAt` | `TIMESTAMP` | Fecha de modificacion automatica |
+
 ---
 
 ## Endpoints de la API
 
-Base URL: `http://localhost:3000`
+Base URL: `http://localhost:3000/api/v1`
 
 ### Productos — `/products`
 
 | Método | Ruta | Descripción | Código de éxito |
 |---|---|---|---|
-| `POST` | `/products` | Crear un nuevo producto | `201 Created` |
-| `GET` | `/products` | Listar productos (con filtros opcionales) | `200 OK` |
-| `GET` | `/products/count` | Contar productos activos | `200 OK` |
-| `GET` | `/products/:id` | Obtener un producto por UUID | `200 OK` |
-| `PATCH` | `/products/:id` | Actualizar parcialmente un producto | `200 OK` |
-| `DELETE` | `/products/:id` | Eliminar permanentemente un producto | `204 No Content` |
-| `PATCH` | `/products/:id/soft-delete` | Desactivar producto (`isActive: false`) | `200 OK` |
-| `PATCH` | `/products/:id/restore` | Restaurar producto (`isActive: true`) | `200 OK` |
+| `POST` | `/api/v1/products` | Crear un nuevo producto | `201 Created` |
+| `GET` | `/api/v1/products` | Listar productos (con filtros opcionales) | `200 OK` |
+| `GET` | `/api/v1/products/count` | Contar productos activos | `200 OK` |
+| `GET` | `/api/v1/products/:id` | Obtener un producto por UUID | `200 OK` |
+| `PATCH` | `/api/v1/products/:id` | Actualizar parcialmente un producto | `200 OK` |
+| `DELETE` | `/api/v1/products/:id` | Eliminar permanentemente un producto | `204 No Content` |
+| `PATCH` | `/api/v1/products/:id/soft-delete` | Desactivar producto (`isActive: false`) | `200 OK` |
+| `PATCH` | `/api/v1/products/:id/restore` | Restaurar producto (`isActive: true`) | `200 OK` |
+
+### Autenticacion — `/auth`
+
+| Metodo | Ruta | Descripcion | Codigo de exito |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/register` | Registrar usuario y devolver token JWT | `201 Created` |
+| `POST` | `/api/v1/auth/login` | Iniciar sesion y devolver token JWT | `201 Created` |
+| `GET` | `/api/v1/auth/me` | Obtener payload del usuario autenticado | `200 OK` |
+| `PATCH` | `/api/v1/auth/users/:id/role` | Cambiar rol de un usuario (solo ADMIN) | `200 OK` |
+
+### Matriz de permisos por rol
+
+| Endpoint | USER | MANAGER | ADMIN |
+|---|---|---|---|
+| `GET /products` | Si | Si | Si |
+| `GET /products/count` | Si | Si | Si |
+| `GET /products/:id` | Si | Si | Si |
+| `POST /products` | No | Si | Si |
+| `PATCH /products/:id` | No | No | Si |
+| `DELETE /products/:id` | No | No | Si |
+| `PATCH /products/:id/soft-delete` | No | No | Si |
+| `PATCH /products/:id/restore` | No | No | Si |
+| `PATCH /api/v1/auth/users/:id/role` | No | No | Si |
 
 ### Filtros disponibles en `GET /products`
 
@@ -91,7 +145,7 @@ Base URL: `http://localhost:3000`
 | `isActive` | `boolean` | Filtrar por estado activo/inactivo |
 | `search` | `string` | Búsqueda insensible a mayúsculas en `name` y `description` |
 
-**Ejemplo:** `GET /products?isActive=true&search=laptop`
+**Ejemplo:** `GET /api/v1/products?isActive=true&search=laptop`
 
 ---
 
@@ -145,7 +199,17 @@ Crear un archivo `.env` en la raíz del proyecto:
 
 ```env
 DATABASE_URL="postgresql://cesun_user:cesun_password@localhost:5432/backend3_db"
+JWT_SECRET="replace-with-a-long-random-secret"
+JWT_EXPIRES_IN="1d"
+ADMIN_SEED_EMAIL="admin@demo.com"
+ADMIN_SEED_PASSWORD="Admin12345!"
 PORT=3000
+```
+
+En requests protegidas, enviar siempre:
+
+```http
+Authorization: Bearer <access_token>
 ```
 
 ---
@@ -186,6 +250,10 @@ npm install
 
 ```env
 DATABASE_URL="postgresql://cesun_user:cesun_password@localhost:5432/backend3_db"
+JWT_SECRET="replace-with-a-long-random-secret"
+JWT_EXPIRES_IN="1d"
+ADMIN_SEED_EMAIL="admin@demo.com"
+ADMIN_SEED_PASSWORD="Admin12345!"
 PORT=3000
 ```
 
@@ -222,7 +290,17 @@ npm run build
 npm run start:prod
 ```
 
-La API estará disponible en: `http://localhost:3000`
+La API estará disponible en: `http://localhost:3000/api/v1`
+
+---
+
+### Paso 7 — Seed de usuario administrador
+
+```bash
+npm run seed
+```
+
+Este comando crea o actualiza un usuario admin con el email y password definidos en `ADMIN_SEED_EMAIL` y `ADMIN_SEED_PASSWORD`.
 
 ---
 
@@ -238,6 +316,7 @@ La API estará disponible en: `http://localhost:3000`
 | `npm run test:cov` | Genera reporte de cobertura de tests |
 | `npm run lint` | Ejecuta ESLint con autocorrección |
 | `npm run format` | Formatea el código con Prettier |
+| `npm run seed` | Crea o actualiza un usuario administrador inicial |
 
 ---
 
@@ -252,32 +331,54 @@ curl -X POST http://localhost:3000/products \
 
 **Listar productos activos con búsqueda:**
 ```bash
-curl "http://localhost:3000/products?isActive=true&search=laptop"
+curl "http://localhost:3000/api/v1/products?isActive=true&search=laptop"
 ```
 
 **Obtener un producto por ID:**
 ```bash
-curl http://localhost:3000/products/{uuid}
+curl http://localhost:3000/api/v1/products/{uuid}
 ```
 
 **Actualizar un producto:**
 ```bash
-curl -X PATCH http://localhost:3000/products/{uuid} \
+curl -X PATCH http://localhost:3000/api/v1/products/{uuid} \
   -H "Content-Type: application/json" \
   -d '{"price": 1199.99}'
 ```
 
 **Soft delete:**
 ```bash
-curl -X PATCH http://localhost:3000/products/{uuid}/soft-delete
+curl -X PATCH http://localhost:3000/api/v1/products/{uuid}/soft-delete
 ```
 
 **Restaurar producto:**
 ```bash
-curl -X PATCH http://localhost:3000/products/{uuid}/restore
+curl -X PATCH http://localhost:3000/api/v1/products/{uuid}/restore
 ```
 
 **Eliminar permanentemente:**
 ```bash
-curl -X DELETE http://localhost:3000/products/{uuid}
+curl -X DELETE http://localhost:3000/api/v1/products/{uuid}
+```
+
+**Registrar usuario ADMIN:**
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@demo.com", "password": "12345678", "role": "ADMIN"}'
+```
+
+**Login y obtencion de JWT:**
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@demo.com", "password": "12345678"}'
+```
+
+**Cambiar rol de usuario (solo ADMIN):**
+```bash
+curl -X PATCH http://localhost:3000/api/v1/auth/users/{user-uuid}/role \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token-admin}" \
+  -d '{"role": "MANAGER"}'
 ```
