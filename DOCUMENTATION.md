@@ -324,7 +324,7 @@ Este comando crea o actualiza un usuario admin con el email y password definidos
 
 **Crear un producto:**
 ```bash
-curl -X POST http://localhost:3000/products \
+curl -X POST http://localhost:3000/api/v1/products \
   -H "Content-Type: application/json" \
   -d '{"name": "Laptop Dell", "description": "Laptop 15 pulgadas", "price": 1299.99, "stock": 10}'
 ```
