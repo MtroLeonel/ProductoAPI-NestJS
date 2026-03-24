@@ -1,3 +1,17 @@
+/**
+ * ARCHIVO: users.service.ts
+ * OBJETIVO: Gestionar operaciones de usuarios (creacion, busqueda, cambio de rol).
+ * RESPONSABILIDADES:
+ *   - toSafeUser(): Elimina password del usuario antes de devolver en respuestas.
+ *   - create(): Hashea password con bcrypt (salt 10), normaliza email, mapea error P2002 (email duplicado).
+ *   - findByEmail(): Busca usuario por email normalizado (lowercase).
+ *   - findSafeById(): Busca usuario por ID, devuelve sin password, lanza 404 si no existe.
+ *   - updateRole(): Actualiza rol de usuario, valida existencia previa, devuelve usuario seguro.
+ * SEGURIDAD PASSWORD: Hash bcrypt con 10 salt rounds, nunca retorna password en respuestas.
+ * NORMALIZACION EMAIL: Todos los emails se convierten a lowercase para evitar duplicados.
+ * TIPO SafeUser: Utilidad TypeScript que omite 'password' del modelo User.
+ * DEPENDENCIAS: PrismaService para acceso a BD, bcrypt para hashing.
+ */
 import {
   BadRequestException,
   Injectable,
@@ -16,16 +30,20 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   private toSafeUser(user: User): SafeUser {
-    const { password: _password, ...safeUser } = user;
+    // Sanitiza el modelo para nunca exponer password hacia afuera.
+    const { password: userPassword, ...safeUser } = user;
+    void userPassword;
     return safeUser;
   }
 
   async create(createUserDto: CreateUserDto): Promise<SafeUser> {
+    // Hashea password antes de persistir; nunca se guarda en texto plano.
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
     try {
       const user = await this.prisma.user.create({
         data: {
+          // Normaliza email para evitar duplicados por mayusculas/minusculas.
           email: createUserDto.email.toLowerCase(),
           password: hashedPassword,
           role: createUserDto.role,
@@ -34,7 +52,10 @@ export class UsersService {
 
       return this.toSafeUser(user);
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new BadRequestException('Ya existe un usuario con ese email');
       }
 
@@ -43,6 +64,7 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
+    // Busca con email normalizado para consistencia de autenticacion.
     return this.prisma.user.findUnique({
       where: {
         email: email.toLowerCase(),
@@ -63,6 +85,7 @@ export class UsersService {
   }
 
   async updateRole(id: string, role: Role): Promise<SafeUser> {
+    // Verifica existencia para evitar actualizar ids inexistentes.
     await this.findSafeById(id);
 
     const user = await this.prisma.user.update({

@@ -1,5 +1,10 @@
 # Documentación Técnica — cesun-backend-project
 
+## Alcance de este documento
+
+- Este archivo (`DOCUMENTATION.md`) es la referencia tecnica completa del proyecto.
+- Para instalacion rapida, ejecucion basica y uso inicial, consulta [`README.md`](./README.md).
+
 ## Descripción General
 
 API REST desarrollada con **NestJS** para la gestión de productos. Implementa operaciones CRUD completas sobre una base de datos **PostgreSQL**, usando **Prisma ORM** como capa de acceso a datos. Incluye soft delete, restauración de registros, búsqueda con filtros dinámicos y autenticación con JWT basada en roles.
@@ -66,6 +71,109 @@ cesun-backend-project/
 ├── Dockerfile                 # Imagen de la app
 └── .env                       # Variables de entorno (no incluido en repo)
 ```
+
+---
+
+## Guia de lectura del codigo (lineas importantes)
+
+Esta seccion resume los puntos mas importantes del codigo para entender la API sin recorrer todo el proyecto desde cero.
+
+### 1) Arranque de la aplicacion
+
+- `src/main.ts`
+- `app.setGlobalPrefix('api/v1')`: define el prefijo comun de todos los endpoints.
+- `ValidationPipe` global con `whitelist`, `forbidNonWhitelisted` y `transform`: asegura validacion estricta y conversion de tipos en DTOs.
+- `app.enableCors()`: habilita llamadas desde frontend o clientes externos.
+
+### 2) Composicion de modulos
+
+- `src/app.module.ts`
+- `ConfigModule.forRoot({ isGlobal: true })`: habilita variables de entorno en toda la app.
+- `PrismaModule`, `UsersModule`, `AuthModule`, `ProductsModule`: separacion por dominio (datos, usuarios, autenticacion y productos).
+
+### 3) Capa de acceso a datos
+
+- `src/prisma/prisma.service.ts`
+- `PrismaService extends PrismaClient`: centraliza el acceso a base de datos.
+- Uso de `Pool` de `pg` + `PrismaPg`: manejo de conexiones mas controlado para entornos reales.
+- `onModuleInit` y `onModuleDestroy`: apertura/cierre ordenado de conexion.
+
+### 4) Flujo de autenticacion
+
+- `src/auth/auth.controller.ts`
+- `POST /auth/register` y `POST /auth/login` son publicos con `@Public()`.
+- `GET /auth/me` requiere JWT y devuelve el usuario autenticado desde `request.user`.
+- `PATCH /auth/users/:id/role` requiere rol `ADMIN`.
+
+- `src/auth/auth.service.ts`
+- `validateUser()`: valida existencia, estado activo y password con `bcrypt.compare`.
+- `signAccessToken()`: firma JWT con `sub`, `email`, `role`.
+- `register()` y `login()`: devuelven siempre `{ user, access_token }` para estandarizar respuesta.
+
+- `src/auth/strategies/jwt.strategy.ts`
+- Extrae token desde `Authorization: Bearer <token>`.
+- `validate(payload)` transforma payload a objeto de usuario que luego consumen los guards.
+
+### 5) Autorizacion por roles
+
+- `src/auth/decorators/roles.decorator.ts`
+- `@Roles(...)`: agrega metadata de roles requeridos por endpoint.
+
+- `src/auth/guards/jwt-auth.guard.ts`
+- Extiende `AuthGuard('jwt')` y respeta `@Public()` leyendo metadata `IS_PUBLIC_KEY`.
+
+- `src/auth/guards/roles.guard.ts`
+- Lee los roles requeridos con `Reflector`.
+- Si no hay roles definidos, permite acceso.
+- Si hay roles, compara `request.user.role` contra la lista requerida.
+
+### 6) Reglas de negocio de productos
+
+- `src/products/products.controller.ts`
+- Guard global del controlador: `@UseGuards(JwtAuthGuard, RolesGuard)`.
+- Roles por endpoint:
+  - Lectura (`GET`): `USER`, `MANAGER`, `ADMIN`.
+  - Creacion (`POST`): `MANAGER`, `ADMIN`.
+  - Mutaciones criticas (`PATCH/DELETE`): `ADMIN`.
+
+- `src/products/products.service.ts`
+- `findAll(query)`: construye filtro dinamico por `isActive` y `search`.
+- `softDelete()` y `restore()`: reutilizan `update()` para evitar duplicar logica.
+- Manejo de errores Prisma:
+  - `P2002`: conflicto de unico (ej. nombre repetido).
+  - `P2025`: recurso no encontrado en operaciones de escritura.
+
+### 7) Reglas de negocio de usuarios
+
+- `src/users/users.service.ts`
+- `create()`: hashea password con bcrypt antes de persistir.
+- `toSafeUser()`: elimina password de respuestas para no exponer datos sensibles.
+- `updateRole()`: actualiza rol y devuelve usuario seguro.
+
+### 8) Contratos de entrada (DTOs)
+
+- `src/auth/dto/register.dto.ts` y `src/auth/dto/login.dto.ts`
+- Validan formato de email y longitud minima de password.
+
+- `src/products/dto/create-product.dto.ts`
+- Valida nombre, precio positivo, maximo de decimales y conversion de tipos con `@Type(() => Number/Boolean)`.
+
+### 9) Modelo y permisos en base de datos
+
+- `prisma/schema.prisma`
+- `enum Role { ADMIN MANAGER USER }`: base del control de permisos.
+- `User`: email unico, password hasheado, rol e indicador `isActive`.
+- `Product`: nombre unico, `price Decimal(10,2)`, `isActive` para soft delete.
+
+### 10) Punto de entrada para mantenimiento futuro
+
+Si necesitas cambiar comportamiento de negocio, este orden ayuda a ubicar rapido donde tocar:
+
+1. Endpoint y permisos: `controller` + `@Roles`.
+2. Logica de negocio: `service`.
+3. Validaciones de entrada: `dto`.
+4. Persistencia: `prisma.service.ts` + `schema.prisma`.
+5. Seguridad transversal: `jwt.strategy.ts`, `jwt-auth.guard.ts`, `roles.guard.ts`.
 
 ---
 

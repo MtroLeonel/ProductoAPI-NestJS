@@ -23,133 +23,95 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+API REST con NestJS + Prisma + PostgreSQL para gestion de productos, autenticacion JWT y autorizacion por roles.
 
-## API auth and permissions
+## Documentation scope
 
-This API now includes:
+- Este archivo es la guia rapida de arranque.
+- La documentacion tecnica completa esta en [DOCUMENTATION.md](./DOCUMENTATION.md).
 
-- User table with role levels: `ADMIN`, `MANAGER`, `USER`
-- JWT authentication with Bearer token
-- Role-based authorization on product endpoints
+## Quick start
 
-### Environment variables
+### Requisitos
 
-Create a `.env` file in project root with:
+- Node.js 18+
+- Docker + Docker Compose
+- npm
+
+### 1) Instalar dependencias
+
+```bash
+npm install
+```
+
+### 2) Levantar base de datos
+
+```bash
+docker-compose up -d
+```
+
+### 3) Configurar variables de entorno (.env)
+
+Crea un archivo `.env` en la raiz del proyecto con:
 
 ```env
 DATABASE_URL="postgresql://cesun_user:cesun_password@localhost:5432/backend3_db"
 JWT_SECRET="replace-with-a-long-random-secret"
 JWT_EXPIRES_IN="1d"
+ADMIN_SEED_EMAIL="admin@demo.com"
+ADMIN_SEED_PASSWORD="Admin12345!"
 PORT=3000
 ```
 
-### Auth endpoints
+### 4) Migraciones y cliente de Prisma
 
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `GET /api/v1/auth/me` (requires Bearer token)
-- `PATCH /api/v1/auth/users/:id/role` (ADMIN only)
+```bash
+npx prisma migrate deploy
+npx prisma generate
+```
 
-Register/login responses include:
-
-- `user`: safe user object without password
-- `access_token`: JWT token to send in protected requests
-
-### Product permissions by role
-
-- `GET /api/v1/products`, `GET /api/v1/products/count`, `GET /api/v1/products/:id`: `USER`, `MANAGER`, `ADMIN`
-- `POST /api/v1/products`: `MANAGER`, `ADMIN`
-- `PATCH /api/v1/products/:id`, `DELETE /api/v1/products/:id`, `PATCH /api/v1/products/:id/soft-delete`, `PATCH /api/v1/products/:id/restore`: `ADMIN`
-
-### Admin user seed
-
-Run:
+### 5) Seed opcional de administrador
 
 ```bash
 npm run seed
 ```
 
-Optional variables:
+### 6) Ejecutar API
 
-```env
-ADMIN_SEED_EMAIL="admin@demo.com"
-ADMIN_SEED_PASSWORD="Admin12345!"
+```bash
+npm run start:dev
 ```
 
-### Authorization header
+Base URL: `http://localhost:3000/api/v1`
+
+## Scripts principales
+
+```bash
+npm run start:dev
+npm run build
+npm run start:prod
+npm run test
+npm run test:e2e
+npm run seed
+```
+
+## Auth rapida
+
+Header para rutas protegidas:
 
 ```http
 Authorization: Bearer <access_token>
 ```
 
-## Project setup
+## Endpoints principales
 
-```bash
-$ npm install
-```
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/products`
+- `POST /api/v1/products`
 
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Referencia completa de endpoints y permisos: [DOCUMENTATION.md](./DOCUMENTATION.md).
 
 ## License
 

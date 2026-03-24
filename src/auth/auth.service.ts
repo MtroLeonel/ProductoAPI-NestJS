@@ -1,3 +1,16 @@
+/**
+ * ARCHIVO: auth.service.ts
+ * OBJETIVO: Orquestar logica de autenticacion (registro, login) y emision de JWT.
+ * RESPONSABILIDADES:
+ *   - signAccessToken(): Firma JWT con payload (sub, email, role) y secreto del .env.
+ *   - register(): Crea usuario nuevo, normaliza email, hashea password, emite token.
+ *   - validateUser(): Valida existencia, estado activo y password contra hash bcrypt.
+ *   - login(): Autentica usuario, devuelve usuario seguro + token.
+ * FLUJO REGISTRO: POST /auth/register -> ValidationPipe -> createUser() -> hashPassword -> signToken -> {user, access_token}.
+ * FLUJO LOGIN: POST /auth/login -> validateUser() -> bcrypt.compare() -> signToken -> {user, access_token}.
+ * SEGURIDAD: Password nunca viaja en respuesta (toSafeUser). Email normalizado (lowercase). Mensajes genericos de error.
+ * DEPENDENCIAS: UsersService (para crear/buscar usuarios), JwtService (para firmar tokens).
+ */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -14,7 +27,12 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  private async signAccessToken(user: { id: string; email: string; role: Role }) {
+  private async signAccessToken(user: {
+    id: string;
+    email: string;
+    role: Role;
+  }) {
+    // Payload minimo para identificar usuario y su nivel de acceso.
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -25,6 +43,7 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
+    // Crea usuario y emite token en la misma respuesta para onboarding rapido.
     const user = await this.usersService.create(registerDto);
     const accessToken = await this.signAccessToken({
       id: user.id,
@@ -38,20 +57,27 @@ export class AuthService {
     };
   }
 
-  private async validateUser(email: string, password: string): Promise<SafeUser> {
+  private async validateUser(
+    email: string,
+    password: string,
+  ): Promise<SafeUser> {
     const user = await this.usersService.findByEmail(email);
 
+    // Bloquea login para usuarios inexistentes o desactivados.
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Credenciales invalidas');
     }
 
+    // Compara contra hash almacenado, nunca contra texto plano.
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Credenciales invalidas');
     }
 
-    const { password: _password, ...safeUser } = user;
+    // Nunca retornamos password fuera de la capa de autenticacion.
+    const { password: userPassword, ...safeUser } = user;
+    void userPassword;
     return safeUser;
   }
 
